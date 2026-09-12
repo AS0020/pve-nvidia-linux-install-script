@@ -63,7 +63,6 @@ Das Skript unterstützt ausschließlich **amd64**:
 | Rolle | Unterstützte Systeme |
 |---|---|
 | Proxmox-Host | Proxmox VE auf Debian 12 oder Debian 13 |
-| Ubuntu-Host | Ubuntu 22.04 LTS, 24.04 LTS oder 26.04 LTS |
 | LXC | Debian 12/13 oder Ubuntu 22.04/24.04/26.04 |
 
 Für die LXC-Verwaltung vom Host werden Proxmox und `pct` benötigt. Auf einem
