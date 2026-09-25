@@ -4,7 +4,7 @@ Interaktives Bash-Skript zur Installation, Aktualisierung, Diagnose und Entfernu
 von NVIDIA-Treibern auf Proxmox-/Ubuntu-Hosts sowie von passenden NVIDIA-
 Userspace-Bibliotheken in Debian- und Ubuntu-LXC.
 
-Die aktuelle Version ist **2.13.0**. Das Skript trennt Host und Container strikt:
+Die aktuelle Version ist **2.13.4**. Das Skript trennt Host und Container strikt:
 Kernelmodule, Kernel-Header und DKMS gehören ausschließlich auf den Host; im LXC
 werden nur die zur geladenen Host-Treiberversion passenden Bibliotheken und
 Werkzeuge installiert.
@@ -63,6 +63,7 @@ Das Skript unterstützt ausschließlich **amd64**:
 | Rolle | Unterstützte Systeme |
 |---|---|
 | Proxmox-Host | Proxmox VE auf Debian 12 oder Debian 13 |
+| Ubuntu-Host | Ubuntu 22.04 LTS, 24.04 LTS oder 26.04 LTS |
 | LXC | Debian 12/13 oder Ubuntu 22.04/24.04/26.04 |
 
 Für die LXC-Verwaltung vom Host werden Proxmox und `pct` benötigt. Auf einem
@@ -86,14 +87,14 @@ gewöhnlichen Ubuntu- oder Debian-System ist keine Proxmox-Gerätezuweisung mög
 Die Dateien auf den Zielhost kopieren und das aktuelle Skript starten:
 
 ```bash
-chmod +x nvidia-driver-setup-v2.13.0.sh
-sudo ./nvidia-driver-setup-v2.13.0.sh
+chmod +x nvidia-driver-setup-v2.13.4.sh
+sudo ./nvidia-driver-setup-v2.13.4.sh
 ```
 
 Wenn bereits als `root` gearbeitet wird:
 
 ```bash
-./nvidia-driver-setup-v2.13.0.sh
+./nvidia-driver-setup-v2.13.4.sh
 ```
 
 Ohne Parameter öffnet sich das vollständige interaktive Menü. Zusätzliche
@@ -161,7 +162,7 @@ gebracht. Seine Bibliotheken müssen exakt zum tatsächlich geladenen Host-Modul
 Mehrere GPUs können stabil ausgewählt werden:
 
 ```bash
-./nvidia-driver-setup-v2.13.0.sh \
+./nvidia-driver-setup-v2.13.4.sh \
   --attach-only 111 \
   --gpu-uuid GPU-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx \
   --gpu-pci 0000:65:00.0 \
@@ -219,7 +220,15 @@ kann, bricht das Update vor der Paketentfernung ab. Für beschädigte Altbestän
 oder Paketlayoutwechsel stehen Reparatur und saubere Neuinstallation getrennt bereit.
 
 Die ausführlichen Änderungen stehen in
-[AENDERUNGEN-v2.13.0.md](AENDERUNGEN-v2.13.0.md).
+[AENDERUNGEN-v2.13.4.md](AENDERUNGEN-v2.13.4.md).
+
+Seit **2.13.4** wählt auch die Neuinstallation bei mehreren offiziellen
+Paketrevisionen die höchste passende DEB-Version. Ein altes `nvidia-modprobe`
+im LXC wird bei aktivierter Fehlerbehebung im gesicherten Updateplan entfernt,
+sofern dabei keine Anwendungen mit entfernt werden. Kernel-/DKMS-Altbestände
+benötigen weiterhin die gesonderte Reparatur beziehungsweise Neuinstallation.
+Die Diagnose unterscheidet OpenCL-Userspace von Hostpaketen und eine
+Signatur-Taint-Meldung von einer tatsächlichen Schlüsselablehnung.
 
 ## Sicherungen, Rollback und Protokolle
 
@@ -264,6 +273,35 @@ Beim nächsten Start erkennt das Skript eine aktive, nicht abgeschlossene
 Transaktion. Sie kann über das Menü fortgesetzt oder anhand der geprüften
 Sicherung zurückgerollt werden. Ein neuer verändernder Vorgang wird nicht einfach
 über eine ungeklärte Transaktion gelegt.
+
+Ab Version **2.13.3** gibt es im Menü **Unterbrochene Transaktion** außerdem
+**4 – Fehlgeschlagenen Host-Updateversuch aufgeben**. Diese Option erscheint
+nur bei eindeutig erkannten reinen Host-Updates mit fehlgeschlagenem Rollback.
+Sie prüft nach ausdrücklicher Bestätigung `dpkg --audit`, `apt-get check` und
+die Übereinstimmung von installiertem Treiberpaket, geladener und installierter
+Modulversion sowie NVML. Root und die globale Skriptsperre sind erforderlich.
+
+Bei erfolgreicher Prüfung wird **nur der aktive Marker archiviert**. Dies ist
+kein Rollback: Der aktuelle Host-Zustand wird akzeptiert; frühere
+Konfigurationsänderungen werden nicht zurückgenommen. Eine beschädigte Sicherung
+wird weder ausgeführt noch durch neue Prüfsummen nachträglich als gültig markiert.
+Der bisherige Backup-Inhalt bleibt unverändert.
+
+Der Marker liegt danach unter
+`/opt/nvidia-backup/.abandoned-transaction-<Backup-Verzeichnisname>`.
+Solange dieser archivierte Marker vorhanden ist, bleibt die zugehörige Sicherung
+von der automatischen Aufbewahrungsbereinigung ausgenommen. Sie benötigt bei
+einer späteren manuellen Bereinigung eine bewusste Prüfung.
+
+Danach kann über **Hauptmenüpunkt 12** ein neues Host-Update mit neuer Sicherung
+gestartet werden. Es startet nicht automatisch. Wird Punkt 12 bei noch aktiver
+Transaktion gewählt, öffnet sich die Wiederanlauf-Auswahl erneut, statt nur
+ins Hauptmenü zurückzuspringen. LXC-Transaktionen, unklare Metadaten und
+inkonsistente Host-Zustände lassen sich über diese Option nicht freigeben.
+
+Die neue Freigabe setzt eine automatische Host-Erkennung voraus (Proxmox oder
+Ubuntu-Host). Auf gewöhnlichen Debian-Hosts ohne Proxmox liefert die bisherige
+Menüerkennung `unknown`; dort wird diese neue Option noch nicht angeboten.
 
 ## Abschlussprüfungen
 
@@ -316,23 +354,23 @@ Das Menü ist der empfohlene Normalbetrieb. Die wichtigsten optionalen Parameter
 Die vollständige aktuelle Liste zeigt:
 
 ```bash
-./nvidia-driver-setup-v2.13.0.sh --help
+./nvidia-driver-setup-v2.13.4.sh --help
 ```
 
 Beispiele:
 
 ```bash
 # Host-Update auf die neueste geeignete Version
-./nvidia-driver-setup-v2.13.0.sh --update --mode host
+./nvidia-driver-setup-v2.13.4.sh --update --mode host
 
 # Schreibgeschützte Update-Vorschau mit vorhandenem APT-Cache
-./nvidia-driver-setup-v2.13.0.sh --update --mode host --dry-run
+./nvidia-driver-setup-v2.13.4.sh --update --mode host --dry-run
 
 # LXC 111 vom Proxmox-Host aktualisieren
-./nvidia-driver-setup-v2.13.0.sh --update-lxc 111
+./nvidia-driver-setup-v2.13.4.sh --update-lxc 111
 
 # Diagnose ohne Paketänderungen
-./nvidia-driver-setup-v2.13.0.sh --diagnose-all
+./nvidia-driver-setup-v2.13.4.sh --diagnose-all
 ```
 
 ## Fehlerbehebung
@@ -369,6 +407,12 @@ Im Menü kann gewählt werden, ob das Skript nur melden und abbrechen oder einde
 erkannte, freigegebene Dienste kontrolliert stoppen und anschließend wieder starten
 soll. Unbekannte oder kritische Prozesse werden nicht blind beendet.
 
+Ab Version 2.13.2 wird auch `beszel-agent.service` erkannt. Seine laufenden
+`nvidia-smi`-Monitoring-Abfragen können den Treiberwechsel blockieren. Mit der
+Menüauswahl **Sichere Dienste kontrolliert stoppen** wird Beszel vorübergehend
+gestoppt und anschließend wieder gestartet. Bei **nur melden und abbrechen**
+bleibt der Dienst unangetastet.
+
 ### Alte oder widersprüchliche NVIDIA-Pakete
 
 - Menüpunkt **6** für einen noch grundsätzlich konsistenten Paketstand.
@@ -383,26 +427,33 @@ erhalten. Diese beiden Pfade sind für eine weitere Analyse am wichtigsten.
 Die vollständige lokale Test-Suite:
 
 ```bash
-bash ./test-nvidia-driver-setup-v2.13.0.sh
+bash ./test-nvidia-driver-setup-v2.13.4.sh
 ```
 
 Gezielte Update-Tests:
 
 ```bash
-bash ./tests/test-nvidia-update.sh ./nvidia-driver-setup-v2.13.0.sh
-bash ./tests/test-nvidia-update-transaction.sh ./nvidia-driver-setup-v2.13.0.sh
-bash ./tests/test-nvidia-update-lxc.sh ./nvidia-driver-setup-v2.13.0.sh
+bash ./tests/test-nvidia-update.sh ./nvidia-driver-setup-v2.13.4.sh
+bash ./tests/test-nvidia-update-transaction.sh ./nvidia-driver-setup-v2.13.4.sh
+bash ./tests/test-nvidia-update-lxc.sh ./nvidia-driver-setup-v2.13.4.sh
+bash ./tests/test-lxc-preconfigure-purge.sh ./nvidia-driver-setup-v2.13.4.sh
+bash ./tests/test-lxc-solver-diagnosis.sh ./nvidia-driver-setup-v2.13.4.sh
+bash ./tests/test-update-log-regressions.sh ./nvidia-driver-setup-v2.13.4.sh
+bash ./tests/test-host-update-abandonment.sh ./nvidia-driver-setup-v2.13.4.sh
+bash ./tests/test-september-package-regressions.sh ./nvidia-driver-setup-v2.13.4.sh
+bash ./tests/test-diagnostic-log-regressions.sh ./nvidia-driver-setup-v2.13.4.sh
+bash ./tests/test-clean-revision-plan.sh ./nvidia-driver-setup-v2.13.4.sh
 ```
 
-Das mitgelieferte Prüfprotokoll [.test-run-v2.13.0.log](.test-run-v2.13.0.log)
-enthält 568 erfolgreiche Syntax-, Funktions- und Simulationstests ohne gemeldeten
-Fehler. Die Tests simulieren Linux-Systemgrenzen; sie ersetzen keinen echten Lauf
-auf Proxmox, Debian oder Ubuntu mit NVIDIA-GPU.
+Das Prüfprotokoll [.test-run-v2.13.4.log](.test-run-v2.13.4.log) dokumentiert den
+erfolgreichen lokalen Gesamtlauf für Version 2.13.4. Die Tests simulieren
+Linux-Systemgrenzen; sie ersetzen keinen echten Lauf auf Proxmox, Debian oder
+Ubuntu mit NVIDIA-GPU.
 
 Die Prüfsumme der lokal verwendeten Skriptdatei kann jederzeit neu berechnet werden:
 
 ```bash
-sha256sum nvidia-driver-setup-v2.13.0.sh
+sha256sum nvidia-driver-setup-v2.13.4.sh
 ```
 
 ## Sicherheitsgrenzen
@@ -424,9 +475,9 @@ sha256sum nvidia-driver-setup-v2.13.0.sh
 
 ## Dateien im Projekt
 
-- [nvidia-driver-setup-v2.13.0.sh](nvidia-driver-setup-v2.13.0.sh) – aktuelles Installationsskript
-- [AENDERUNGEN-v2.13.0.md](AENDERUNGEN-v2.13.0.md) – technische Änderungen der Version 2.13.0
-- [test-nvidia-driver-setup-v2.13.0.sh](test-nvidia-driver-setup-v2.13.0.sh) – vollständige lokale Testsuite
+- [nvidia-driver-setup-v2.13.4.sh](nvidia-driver-setup-v2.13.4.sh) – aktuelles Installationsskript
+- [AENDERUNGEN-v2.13.4.md](AENDERUNGEN-v2.13.4.md) – technische Änderungen der Version 2.13.4
+- [test-nvidia-driver-setup-v2.13.4.sh](test-nvidia-driver-setup-v2.13.4.sh) – vollständige lokale Testsuite
 - [`tests/`](tests/) – zusätzliche Verhaltens- und Regressionstests
 
 ## Lizenz
